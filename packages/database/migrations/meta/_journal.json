@@ -64,6 +64,13 @@
 			"when": 1757906146000,
 			"tag": "0008_add_preferences_column",
 			"breakpoints": true
+		},
+		{
+			"idx": 9,
+			"version": "5",
+			"when": 1757906147000,
+			"tag": "0009_add_missing_schema_elements",
+			"breakpoints": true
 		}
 	]
 }
