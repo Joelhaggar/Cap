@@ -1,6 +1,7 @@
 import { CAP_LOGO_URL } from "@cap/utils";
 import {
 	Body,
+	Button,
 	Container,
 	Head,
 	Heading,
@@ -16,9 +17,11 @@ import Footer from "./components/Footer";
 export function OTPEmail({
 	email = "",
 	code = "",
+	magicLink = "",
 }: {
 	email: string;
 	code: string;
+	magicLink?: string;
 }) {
 	return (
 		<Html>
@@ -57,6 +60,24 @@ export function OTPEmail({
 							This code will expire in 10 minutes. If you didn't request this
 							code, you can safely ignore this email.
 						</Text>
+						{magicLink && (
+							<>
+								<div className="my-8 text-center">
+									<div className="h-px bg-gray-300 my-4" />
+									<Text className="text-sm leading-6 text-black my-4">
+										Or click the button below to sign in directly:
+									</Text>
+								</div>
+								<Section className="text-center my-8">
+									<Button
+										href={magicLink}
+										className="px-6 py-3 text-white bg-blue-600 rounded-lg text-sm font-medium"
+									>
+										Sign in to Cap
+									</Button>
+								</Section>
+							</>
+						)}
 						<Footer email={email} />
 					</Container>
 				</Body>

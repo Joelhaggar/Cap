@@ -74,7 +74,7 @@ export const authOptions = (): NextAuthOptions => {
 					async generateVerificationToken() {
 						return crypto.randomInt(100000, 1000000).toString();
 					},
-					async sendVerificationRequest({ identifier, token }) {
+					async sendVerificationRequest({ identifier, token, url }) {
 						console.log("sendVerificationRequest");
 
 						if (!serverEnv().RESEND_API_KEY) {
@@ -88,15 +88,20 @@ export const authOptions = (): NextAuthOptions => {
 							);
 							console.log(`📧 Email: ${identifier}`);
 							console.log(`🔢 Code: ${token}`);
+							console.log(`🔗 Magic Link: ${url}`);
 							console.log(`⏱️  Expires in: 10 minutes`);
 							console.log(
 								"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
 							);
 							console.log("\n");
 						} else {
-							console.log({ identifier, token });
+							console.log({ identifier, token, url });
 							const { OTPEmail } = await import("../emails/otp-email");
-							const email = OTPEmail({ code: token, email: identifier });
+							const email = OTPEmail({ 
+								code: token, 
+								email: identifier, 
+								magicLink: url 
+							});
 							console.log({ email });
 							await sendEmail({
 								email: identifier,

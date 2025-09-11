@@ -275,6 +275,9 @@ export function LoginForm() {
 												.then((res) => {
 													setLoading(false);
 
+													// Debug: Log the actual NextAuth response
+													console.log("NextAuth signIn response:", res);
+
 													// NextAuth email provider doesn't set res.ok = true, so check for no error instead
 													if (!res?.error) {
 														setEmailSent(true);
