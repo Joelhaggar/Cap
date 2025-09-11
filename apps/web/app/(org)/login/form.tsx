@@ -275,7 +275,8 @@ export function LoginForm() {
 												.then((res) => {
 													setLoading(false);
 
-													if (res?.ok && !res?.error) {
+													// NextAuth email provider doesn't set res.ok = true, so check for no error instead
+													if (!res?.error) {
 														setEmailSent(true);
 														setLastEmailSentTime(Date.now());
 														trackEvent("auth_email_sent", {
@@ -288,12 +289,17 @@ export function LoginForm() {
 														});
 														router.push(`/verify-otp?${params.toString()}`);
 													} else {
-														// NextAuth always returns "EmailSignin" for all email provider errors
-														// Since we already check rate limiting on the client side before sending,
-														// if we get an error here, it's likely rate limiting from the server
-														toast.error(
-															"Please wait 30 seconds before requesting a new code",
-														);
+														// Handle specific error cases
+														console.error("NextAuth signIn error:", res.error);
+														if (res.error === "EmailSignin") {
+															toast.error(
+																"Please wait 30 seconds before requesting a new code",
+															);
+														} else {
+															toast.error(
+																res.error || "Error sending email - try again?",
+															);
+														}
 													}
 												})
 												.catch((error) => {
