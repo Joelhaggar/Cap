@@ -69,7 +69,14 @@
 			"idx": 9,
 			"version": "5",
 			"when": 1757906147000,
-			"tag": "0009_add_missing_schema_elements",
+			"tag": "0009_add_notifications_table",
+			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "5",
+			"when": 1757906148000,
+			"tag": "0010_add_videos_duration",
 			"breakpoints": true
 		}
 	]
