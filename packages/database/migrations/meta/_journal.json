@@ -61,22 +61,15 @@
 		{
 			"idx": 8,
 			"version": "5",
-			"when": 1757906146000,
-			"tag": "0008_add_preferences_column",
+			"when": 1757906147000,
+			"tag": "0008_add_notifications_table",
 			"breakpoints": true
 		},
 		{
 			"idx": 9,
 			"version": "5",
-			"when": 1757906147000,
-			"tag": "0009_add_notifications_table",
-			"breakpoints": true
-		},
-		{
-			"idx": 10,
-			"version": "5",
 			"when": 1757906148000,
-			"tag": "0010_add_videos_duration",
+			"tag": "0009_add_videos_duration",
 			"breakpoints": true
 		}
 	]
