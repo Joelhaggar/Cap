@@ -265,52 +265,66 @@ export function LoginForm() {
 												method: "email",
 												is_signup: !oauthError,
 											});
-											signIn("email", {
-												email,
-												redirect: false,
-												...(next && next.length > 0
-													? { callbackUrl: next }
-													: {}),
-											})
-												.then((res) => {
-													setLoading(false);
+											setLoading(true);
 
-													// Debug: Log the actual NextAuth response
-													console.log("NextAuth signIn response:", res);
-
-													// NextAuth email provider doesn't set res.ok = true, so check for no error instead
-													if (!res?.error) {
-														setEmailSent(true);
-														setLastEmailSentTime(Date.now());
-														trackEvent("auth_email_sent", {
-															email_domain: email.split("@")[1],
-														});
-														const params = new URLSearchParams({
-															email,
-															...(next && { next }),
-															lastSent: Date.now().toString(),
-														});
-														router.push(`/verify-otp?${params.toString()}`);
-													} else {
-														// Handle specific error cases
-														console.error("NextAuth signIn error:", res.error);
-														if (res.error === "EmailSignin") {
-															toast.error(
-																"Please wait 30 seconds before requesting a new code",
-															);
-														} else {
-															toast.error(
-																res.error || "Error sending email - try again?",
-															);
-														}
-													}
-												})
-												.catch((error) => {
-													setEmailSent(false);
-													setLoading(false);
-													// Catch block is rarely triggered with NextAuth
-													toast.error("Error sending email - try again?");
+											try {
+												const res = await signIn("email", {
+													email,
+													redirect: false,
+													...(next && next.length > 0
+														? { callbackUrl: next }
+														: {}),
 												});
+
+												console.log("NextAuth signIn response:", res);
+
+												// Check if email was sent successfully
+												// NextAuth email provider returns { error: undefined, status: 200, ok: true, url: null }
+												// OR it might return { error: "EmailSignin" } if there's an issue
+												if (!res?.error) {
+													// Email sent successfully
+													setEmailSent(true);
+													setLastEmailSentTime(Date.now());
+													trackEvent("auth_email_sent", {
+														email_domain: email.split("@")[1],
+													});
+
+													// Redirect to OTP verification page
+													const params = new URLSearchParams({
+														email,
+														...(next && { next }),
+														lastSent: Date.now().toString(),
+													});
+
+													const redirectUrl = `/verify-otp?${params.toString()}`;
+													console.log("Redirecting to:", redirectUrl);
+
+													toast.success("Email sent! Check your inbox for the code or magic link.");
+
+													// Force navigation with window.location as fallback
+													router.push(redirectUrl).catch((err) => {
+														console.error("Router push failed:", err);
+														window.location.href = redirectUrl;
+													});
+												} else {
+													// Handle errors
+													console.error("NextAuth signIn error:", res.error);
+													if (res.error === "EmailSignin") {
+														toast.error(
+															"Please wait 30 seconds before requesting a new code",
+														);
+													} else {
+														toast.error(
+															res.error || "Error sending email - try again?",
+														);
+													}
+												}
+											} catch (error) {
+												console.error("Email sign-in error:", error);
+												toast.error("Error sending email - try again?");
+											} finally {
+												setLoading(false);
+											}
 										}}
 										className="flex flex-col space-y-3"
 									>

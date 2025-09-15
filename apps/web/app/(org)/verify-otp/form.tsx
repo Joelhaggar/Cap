@@ -161,10 +161,16 @@ export function VerifyOTPForm({
 
 			<div className="flex flex-col justify-center items-center my-7 text-center">
 				<h1 className="text-2xl font-semibold text-gray-12">
-					Enter verification code
+					Check your email!
 				</h1>
 				<p className="text-[16px] text-gray-10 mt-2">
-					We sent a 6-digit code to {email}
+					We sent a 6-digit verification code to:
+				</p>
+				<p className="text-[16px] font-semibold text-gray-12 mt-1">
+					{email}
+				</p>
+				<p className="text-sm text-gray-9 mt-3">
+					You can also click the magic link in the email to sign in directly
 				</p>
 			</div>
 
