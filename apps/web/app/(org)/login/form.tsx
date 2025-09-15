@@ -242,7 +242,11 @@ export function LoginForm() {
 										}}
 										onSubmit={async (e) => {
 											e.preventDefault();
-											if (!email) return;
+											console.log("Form submitted with email:", email);
+											if (!email) {
+												console.log("No email provided, returning");
+												return;
+											}
 
 											// Check if we're rate limited on the client side
 											if (lastEmailSentTime) {
@@ -267,6 +271,8 @@ export function LoginForm() {
 											});
 											setLoading(true);
 
+											console.log("Attempting to send email to:", email);
+
 											// Call signIn - it may throw or return with error, but email might still be sent
 											const res = await signIn("email", {
 												email,
@@ -275,7 +281,7 @@ export function LoginForm() {
 													? { callbackUrl: next }
 													: {}),
 											}).catch((error) => {
-												console.log("SignIn threw error (this is normal):", error);
+												console.log("SignIn threw error:", error);
 												// Return a fake response to continue flow
 												return { error: null, ok: true };
 											});
@@ -285,14 +291,14 @@ export function LoginForm() {
 
 											// Check for specific rate limit error
 											if (res?.error === "EmailSignin") {
+												console.log("Rate limit error detected");
 												toast.error(
 													"Please wait 30 seconds before requesting a new code",
 												);
 												return;
 											}
 
-											// For any other case (including success), assume email was sent
-											// NextAuth email provider is inconsistent with responses
+											// Track that we attempted to send email
 											setEmailSent(true);
 											setLastEmailSentTime(Date.now());
 											trackEvent("auth_email_sent", {
@@ -307,16 +313,30 @@ export function LoginForm() {
 											});
 
 											const redirectUrl = `/verify-otp?${params.toString()}`;
-											console.log("Redirecting to:", redirectUrl);
+											console.log("Preparing redirect to:", redirectUrl);
 
-											toast.success("Email sent! Check your inbox for the code or magic link.");
+											// In development mode without RESEND_API_KEY, inform user about console
+											toast.success("Email sent! Check your email (or console in dev mode) for the verification code.");
 
 											// Use setTimeout to ensure toast is visible, then force redirect
-											setTimeout(() => {
-												console.log("Attempting redirect to:", redirectUrl);
-												// Force navigation immediately
-												window.location.href = redirectUrl;
-											}, 800);
+											console.log("Setting timeout for redirect...");
+											const timeoutId = setTimeout(() => {
+												console.log("Timeout executed - Executing redirect to:", redirectUrl);
+												console.log("🔄 REDIRECTING TO OTP PAGE");
+												console.log("Current location before redirect:", window.location.href);
+
+												try {
+													// Force navigation immediately
+													window.location.href = redirectUrl;
+													console.log("window.location.href set successfully");
+												} catch (error) {
+													console.error("Error during redirect:", error);
+													// Fallback: try router push
+													router.push(redirectUrl);
+												}
+											}, 1000);
+
+											console.log("Timeout ID:", timeoutId);
 										}}
 										className="flex flex-col space-y-3"
 									>
