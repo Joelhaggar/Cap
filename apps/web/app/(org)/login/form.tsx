@@ -308,8 +308,9 @@ export function LoginForm() {
 
 											// Always redirect to OTP page after attempting to send email
 											console.log("Next parameter from URL:", next);
+											console.log("Email for redirect:", email);
 											const params = new URLSearchParams({
-												email,
+												email: email.trim(), // Ensure email is properly trimmed
 												...(next && { next }),
 												lastSent: Date.now().toString(),
 											});
@@ -317,6 +318,7 @@ export function LoginForm() {
 											const baseUrl = window.location.origin;
 											const redirectUrl = `${baseUrl}/verify-otp?${params.toString()}`;
 											console.log("Generated redirect URL:", redirectUrl);
+											console.log("URLSearchParams:", params.toString());
 											console.log("Current window location:", window.location.href);
 
 											// In development mode without RESEND_API_KEY, inform user about console
