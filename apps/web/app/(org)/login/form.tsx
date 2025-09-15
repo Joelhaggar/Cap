@@ -25,7 +25,6 @@ const MotionLink = motion(Link);
 const MotionButton = motion(Button);
 
 export function LoginForm() {
-	console.log("🚀 LoginForm component loaded");
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const next = searchParams?.get("next");
