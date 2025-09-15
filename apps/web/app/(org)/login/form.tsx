@@ -25,6 +25,7 @@ const MotionLink = motion(Link);
 const MotionButton = motion(Button);
 
 export function LoginForm() {
+	console.log("🚀 LoginForm component loaded");
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const next = searchParams?.get("next");
@@ -306,14 +307,17 @@ export function LoginForm() {
 											});
 
 											// Always redirect to OTP page after attempting to send email
+											console.log("Next parameter from URL:", next);
 											const params = new URLSearchParams({
 												email,
 												...(next && { next }),
 												lastSent: Date.now().toString(),
 											});
 
-											const redirectUrl = `/verify-otp?${params.toString()}`;
-											console.log("Preparing redirect to:", redirectUrl);
+											const baseUrl = window.location.origin;
+											const redirectUrl = `${baseUrl}/verify-otp?${params.toString()}`;
+											console.log("Generated redirect URL:", redirectUrl);
+											console.log("Current window location:", window.location.href);
 
 											// In development mode without RESEND_API_KEY, inform user about console
 											toast.success("Email sent! Check your email (or console in dev mode) for the verification code.");
