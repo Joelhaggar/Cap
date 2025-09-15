@@ -311,13 +311,12 @@ export function LoginForm() {
 
 											toast.success("Email sent! Check your inbox for the code or magic link.");
 
-											// Use setTimeout to ensure toast is visible before redirect
+											// Use setTimeout to ensure toast is visible, then force redirect
 											setTimeout(() => {
-												router.push(redirectUrl).catch((err) => {
-													console.error("Router push failed, using window.location:", err);
-													window.location.href = redirectUrl;
-												});
-											}, 100);
+												console.log("Attempting redirect to:", redirectUrl);
+												// Force navigation immediately
+												window.location.href = redirectUrl;
+											}, 800);
 										}}
 										className="flex flex-col space-y-3"
 									>
