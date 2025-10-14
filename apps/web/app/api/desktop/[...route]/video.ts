@@ -196,12 +196,17 @@ app.get(
 					videoId: idToUse,
 				});
 
-			if (buildEnv.NEXT_PUBLIC_IS_CAP && NODE_ENV === "production")
-				await dub().links.create({
-					url: `${serverEnv().WEB_URL}/s/${idToUse}`,
-					domain: "cap.link",
-					key: idToUse,
-				});
+			if (buildEnv.NEXT_PUBLIC_IS_CAP === "true" && NODE_ENV === "production") {
+				try {
+					await dub().links.create({
+						url: `${serverEnv().WEB_URL}/s/${idToUse}`,
+						domain: "cap.link",
+						key: idToUse,
+					});
+				} catch (error) {
+					console.warn("Failed to create Dub short link:", error);
+				}
+			}
 
 			try {
 				const videoCount = await db()
