@@ -86,6 +86,7 @@ export const users = mysqlTable(
 		onboarding_completed_at: timestamp("onboarding_completed_at"),
 		customBucket: nanoIdNullable("customBucket"),
 		inviteQuota: int("inviteQuota").notNull().default(1),
+		defaultOrgId: nanoIdNullable("defaultOrgId"),
 	},
 	(table) => ({
 		emailIndex: uniqueIndex("email_idx").on(table.email),
@@ -153,6 +154,14 @@ export const organizations = mysqlTable(
 		allowedEmailDomain: varchar("allowedEmailDomain", { length: 255 }),
 		customDomain: varchar("customDomain", { length: 255 }),
 		domainVerified: timestamp("domainVerified"),
+		settings: json("settings").$type<{
+			disableSummary?: boolean;
+			disableCaptions?: boolean;
+			disableChapters?: boolean;
+			disableReactions?: boolean;
+			disableTranscript?: boolean;
+			disableComments?: boolean;
+		}>(),
 		iconUrl: varchar("iconUrl", { length: 1024 }),
 		createdAt: timestamp("createdAt").notNull().defaultNow(),
 		updatedAt: timestamp("updatedAt").notNull().defaultNow().onUpdateNow(),
