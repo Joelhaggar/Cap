@@ -29,9 +29,9 @@ export const sendEmail = async ({
 	let from;
 
 	if (marketing) from = "Richie from Cap <richie@send.cap.so>";
-	else if (buildEnv.NEXT_PUBLIC_IS_CAP)
+	else if (buildEnv.NEXT_PUBLIC_IS_CAP === "true")
 		from = "Cap Auth <no-reply@auth.cap.so>";
-	else from = `auth@${serverEnv().RESEND_FROM_DOMAIN}`;
+	else from = process.env.EMAIL_FROM || `noreply@${serverEnv().RESEND_FROM_DOMAIN}`;
 
 	return r.emails.send({
 		from,
