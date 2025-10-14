@@ -122,6 +122,23 @@ export const authOptions = (): NextAuthOptions => {
 		},
 		events: {
 			async signIn({ user, account, isNewUser }) {
+				// SIGNUP RESTRICTION: Check if invite is required for new signups
+				if (isNewUser) {
+					const { isSignupAllowed } = await import("./signup-restrictions");
+					const signupCheck = await isSignupAllowed(user.email || "");
+
+					if (!signupCheck.allowed) {
+						console.log(
+							`🚫 Signup blocked for ${user.email}: ${signupCheck.reason}`,
+						);
+						throw new Error(
+							signupCheck.reason || "Signups are restricted on this instance",
+						);
+					}
+
+					console.log(`✅ Signup allowed for ${user.email}`);
+				}
+
 				const [dbUser] = await db()
 					.select()
 					.from(users)
