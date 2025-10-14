@@ -102,7 +102,7 @@ export const ShareHeader = ({
 		} else if (buildEnv.NEXT_PUBLIC_IS_CAP && customDomain && domainVerified) {
 			return `https://${customDomain}/s/${data.id}`;
 		} else if (
-			buildEnv.NEXT_PUBLIC_IS_CAP &&
+			buildEnv.NEXT_PUBLIC_IS_CAP === "true" &&
 			!customDomain &&
 			!domainVerified
 		) {
@@ -120,7 +120,7 @@ export const ShareHeader = ({
 		} else if (buildEnv.NEXT_PUBLIC_IS_CAP && customDomain && domainVerified) {
 			return `${customDomain}/s/${data.id}`;
 		} else if (
-			buildEnv.NEXT_PUBLIC_IS_CAP &&
+			buildEnv.NEXT_PUBLIC_IS_CAP === "true" &&
 			!customDomain &&
 			!domainVerified
 		) {

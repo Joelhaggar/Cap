@@ -297,9 +297,9 @@ export const CapCard = ({
 		handleCopy(
 			NODE_ENV === "development"
 				? `${webUrl}/s/${cap.id}`
-				: buildEnv.NEXT_PUBLIC_IS_CAP && customDomain && domainVerified
+				: buildEnv.NEXT_PUBLIC_IS_CAP === "true" && customDomain && domainVerified
 					? `https://${customDomain}/s/${cap.id}`
-					: buildEnv.NEXT_PUBLIC_IS_CAP && !customDomain && !domainVerified
+					: buildEnv.NEXT_PUBLIC_IS_CAP === "true" && !customDomain && !domainVerified
 						? `https://cap.link/${cap.id}`
 						: `${webUrl}/s/${cap.id}`,
 		);
