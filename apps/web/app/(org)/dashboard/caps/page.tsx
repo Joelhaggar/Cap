@@ -9,6 +9,7 @@ import {
 	spaceVideos,
 	users,
 	videos,
+	videoUploads,
 } from "@cap/database/schema";
 import { serverEnv } from "@cap/env";
 import { Video } from "@cap/web-domain";
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 // Helper function to fetch shared spaces data for videos
-async function getSharedSpacesForVideos(videoIds: string[]) {
+async function getSharedSpacesForVideos(videoIds: Video.VideoId[]) {
 	if (videoIds.length === 0) return {};
 
 	// Fetch space-level sharing
@@ -95,26 +96,30 @@ async function getSharedSpacesForVideos(videoIds: string[]) {
 	return sharedSpacesMap;
 }
 
-export default async function CapsPage({
-	searchParams,
-}: {
-	searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default async function CapsPage(props: PageProps<"/dashboard/caps">) {
+	const searchParams = await props.searchParams;
 	const user = await getCurrentUser();
 
 	if (!user || !user.id) {
 		redirect("/login");
 	}
 
-	const userId = user.id;
 	const page = Number(searchParams.page) || 1;
 	const limit = Number(searchParams.limit) || 15;
+
+	const userId = user.id;
 	const offset = (page - 1) * limit;
 
 	const totalCountResult = await db()
 		.select({ count: count() })
 		.from(videos)
-		.where(eq(videos.ownerId, userId));
+		.leftJoin(organizations, eq(videos.orgId, organizations.id))
+		.where(
+			and(
+				eq(videos.ownerId, userId),
+				eq(organizations.id, user.activeOrganizationId),
+			),
+		);
 
 	const totalCount = totalCountResult[0]?.count || 0;
 
@@ -172,20 +177,31 @@ export default async function CapsPage({
           ${videos.createdAt}
         )
       `,
-			hasPassword: sql<number>`IF(${videos.password} IS NULL, 0, 1)`,
+			hasPassword: sql`${videos.password} IS NOT NULL`.mapWith(Boolean),
+			hasActiveUpload: sql`${videoUploads.videoId} IS NOT NULL`.mapWith(
+				Boolean,
+			),
+			settings: videos.settings,
 		})
 		.from(videos)
 		.leftJoin(comments, eq(videos.id, comments.videoId))
-		.leftJoin(sharedVideos, eq(videos.id, sharedVideos.videoId))
-		.leftJoin(organizations, eq(sharedVideos.organizationId, organizations.id))
+		.leftJoin(organizations, eq(videos.orgId, organizations.id))
 		.leftJoin(users, eq(videos.ownerId, users.id))
-		.where(and(eq(videos.ownerId, userId), isNull(videos.folderId)))
+		.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
+		.where(
+			and(
+				eq(videos.ownerId, userId),
+				eq(videos.orgId, user.activeOrganizationId),
+				isNull(videos.folderId),
+			),
+		)
 		.groupBy(
 			videos.id,
 			videos.ownerId,
 			videos.name,
 			videos.createdAt,
 			videos.metadata,
+			videos.orgId,
 			users.name,
 		)
 		.orderBy(
@@ -227,6 +243,7 @@ export default async function CapsPage({
 			...videoWithoutEffectiveDate,
 			id: Video.VideoId.make(video.id),
 			foldersData,
+			settings: video.settings,
 			sharedOrganizations: Array.isArray(video.sharedOrganizations)
 				? video.sharedOrganizations.filter(
 						(organization) => organization.id !== null,
@@ -242,7 +259,6 @@ export default async function CapsPage({
 						[key: string]: any;
 				  }
 				| undefined,
-			hasPassword: video.hasPassword === 1,
 		};
 	});
 

@@ -6,11 +6,12 @@ import {
 	sharedVideos,
 	users,
 	videos,
+	videoUploads,
 } from "@cap/database/schema";
 import type { VideoMetadata } from "@cap/database/types";
 import { buildEnv } from "@cap/env";
 import { provideOptionalAuth, Videos, VideosPolicy } from "@cap/web-backend";
-import { Policy, type Video } from "@cap/web-domain";
+import { type Organisation, Policy, type Video } from "@cap/web-domain";
 import { eq, sql } from "drizzle-orm";
 import { Effect, Option } from "effect";
 import type { Metadata } from "next";
@@ -22,16 +23,10 @@ import { isAiGenerationEnabled } from "@/utils/flags";
 import { EmbedVideo } from "./_components/EmbedVideo";
 import { PasswordOverlay } from "./_components/PasswordOverlay";
 
-export const dynamic = "auto";
-export const dynamicParams = true;
-export const revalidate = 30;
-
-type Props = {
-	params: { [key: string]: string | string[] | undefined };
-	searchParams: { [key: string]: string | string[] | undefined };
-};
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(
+	props: PageProps<"/embed/[videoId]">,
+): Promise<Metadata> {
+	const params = await props.params;
 	const videoId = params.videoId as Video.VideoId;
 
 	return Effect.flatMap(Videos, (v) => v.getById(videoId)).pipe(
@@ -110,9 +105,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	);
 }
 
-export default async function EmbedVideoPage(props: Props) {
-	const params = props.params;
-	const searchParams = props.searchParams;
+export default async function EmbedVideoPage(
+	props: PageProps<"/embed/[videoId]">,
+) {
+	const params = await props.params;
+	const searchParams = await props.searchParams;
 	const videoId = params.videoId as Video.VideoId;
 	const autoplay = searchParams.autoplay === "true";
 
@@ -125,15 +122,17 @@ export default async function EmbedVideoPage(props: Props) {
 					id: videos.id,
 					name: videos.name,
 					ownerId: videos.ownerId,
+					orgId: videos.orgId,
+					settings: videos.settings,
 					createdAt: videos.createdAt,
 					updatedAt: videos.updatedAt,
-					awsRegion: videos.awsRegion,
-					awsBucket: videos.awsBucket,
 					bucket: videos.bucket,
 					metadata: videos.metadata,
 					public: videos.public,
 					videoStartTime: videos.videoStartTime,
 					audioStartTime: videos.audioStartTime,
+					awsRegion: videos.awsRegion,
+					awsBucket: videos.awsBucket,
 					xStreamInfo: videos.xStreamInfo,
 					jobId: videos.jobId,
 					jobStatus: videos.jobStatus,
@@ -146,20 +145,30 @@ export default async function EmbedVideoPage(props: Props) {
 					height: videos.height,
 					duration: videos.duration,
 					fps: videos.fps,
-					hasPassword: sql<number>`IF(${videos.password} IS NULL, 0, 1)`,
+					hasPassword: sql`${videos.password} IS NOT NULL`.mapWith(Boolean),
 					sharedOrganization: {
 						organizationId: sharedVideos.organizationId,
 					},
+					hasActiveUpload: sql`${videoUploads.videoId} IS NOT NULL`.mapWith(
+						Boolean,
+					),
 				})
 				.from(videos)
 				.leftJoin(sharedVideos, eq(videos.id, sharedVideos.videoId))
+				.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
 				.where(eq(videos.id, videoId)),
 		).pipe(Policy.withPublicPolicy(videosPolicy.canView(videoId)));
 
 		return Option.fromNullable(video);
 	}).pipe(
 		Effect.flatten,
-		Effect.map((video) => ({ needsPassword: false, video }) as const),
+		Effect.map(
+			(video) =>
+				({
+					needsPassword: false,
+					video,
+				}) as const,
+		),
 		Effect.catchTag("VerifyVideoPasswordError", () =>
 			Effect.succeed({ needsPassword: true } as const),
 		),
@@ -174,7 +183,7 @@ export default async function EmbedVideoPage(props: Props) {
 		Effect.catchTags({
 			PolicyDenied: () =>
 				Effect.succeed(
-					<div className="flex flex-col justify-center items-center min-h-screen text-center bg-black text-white">
+					<div className="flex flex-col justify-center items-center min-h-screen text-center text-white bg-black">
 						<h1 className="mb-4 text-2xl font-bold">This video is private</h1>
 						<p className="text-gray-400">
 							If you own this video, please <Link href="/login">sign in</Link>{" "}
@@ -194,7 +203,8 @@ async function EmbedContent({
 	autoplay,
 }: {
 	video: Omit<typeof videos.$inferSelect, "password"> & {
-		sharedOrganization: { organizationId: string } | null;
+		sharedOrganization: { organizationId: Organisation.OrganisationId } | null;
+		hasActiveUpload: boolean | undefined;
 	};
 	autoplay: boolean;
 }) {
@@ -228,7 +238,7 @@ async function EmbedContent({
 				!user.email.endsWith(`@${organization[0].allowedEmailDomain}`)
 			) {
 				return (
-					<div className="flex flex-col justify-center items-center min-h-screen text-center bg-black text-white">
+					<div className="flex flex-col justify-center items-center min-h-screen text-center text-white bg-black">
 						<h1 className="mb-4 text-2xl font-bold">Access Restricted</h1>
 						<p className="mb-2 text-gray-300">
 							This video is only accessible to members of this organization.
@@ -275,7 +285,7 @@ async function EmbedContent({
 
 	if (video.isScreenshot === true) {
 		return (
-			<div className="flex items-center justify-center min-h-screen bg-black text-white">
+			<div className="flex justify-center items-center min-h-screen text-white bg-black">
 				<p>Screenshots cannot be embedded</p>
 			</div>
 		);

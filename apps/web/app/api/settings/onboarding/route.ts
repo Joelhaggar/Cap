@@ -6,6 +6,7 @@ import {
 	organizations,
 	users,
 } from "@cap/database/schema";
+import { Organisation } from "@cap/web-domain";
 import { and, eq, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import type { NextRequest } from "next/server";
@@ -47,11 +48,7 @@ export async function POST(request: NextRequest) {
 		)
 		.limit(1);
 
-	console.log("memberButNotOwner", memberButNotOwner);
-
 	const isMemberOfOrganization = memberButNotOwner.length > 0;
-
-	console.log("isMemberOfOrganization", isMemberOfOrganization);
 
 	const [organization] = await db()
 		.select()
@@ -68,7 +65,7 @@ export async function POST(request: NextRequest) {
 		);
 
 	if (!organization) {
-		const organizationId = nanoId();
+		const organizationId = Organisation.OrganisationId.make(nanoId());
 
 		await db()
 			.insert(organizations)

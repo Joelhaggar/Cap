@@ -1,11 +1,13 @@
 import { db } from "@cap/database";
-import { s3Buckets, videos } from "@cap/database/schema";
+import { organizations, s3Buckets, videos } from "@cap/database/schema";
 import { serverEnv } from "@cap/env";
+import { S3Buckets } from "@cap/web-backend";
 import type { Video } from "@cap/web-domain";
 import { createClient } from "@deepgram/sdk";
 import { eq } from "drizzle-orm";
+import { Option } from "effect";
 import { generateAiMetadata } from "@/actions/videos/generate-ai-metadata";
-import { createBucketProvider } from "@/utils/s3";
+import { runPromise } from "./server";
 
 type TranscribeResult = {
 	success: boolean;
@@ -36,9 +38,12 @@ export async function transcribeVideo(
 		.select({
 			video: videos,
 			bucket: s3Buckets,
+			settings: videos.settings,
+			orgSettings: organizations.settings,
 		})
 		.from(videos)
 		.leftJoin(s3Buckets, eq(videos.bucket, s3Buckets.id))
+		.leftJoin(organizations, eq(videos.orgId, organizations.id))
 		.where(eq(videos.id, videoId));
 
 	if (query.length === 0) {
@@ -57,6 +62,31 @@ export async function transcribeVideo(
 	}
 
 	if (
+		video.settings?.disableTranscript ??
+		result.orgSettings?.disableTranscript
+	) {
+		console.log(
+			`[transcribeVideo] Transcription disabled for video ${videoId}`,
+		);
+		try {
+			await db()
+				.update(videos)
+				.set({ transcriptionStatus: "SKIPPED" })
+				.where(eq(videos.id, videoId));
+		} catch (err) {
+			console.error(`[transcribeVideo] Failed to mark as skipped:`, err);
+			return {
+				success: false,
+				message: "Transcription disabled, but failed to update status",
+			};
+		}
+		return {
+			success: true,
+			message: "Transcription disabled for video — skipping transcription",
+		};
+	}
+
+	if (
 		video.transcriptionStatus === "COMPLETE" ||
 		video.transcriptionStatus === "PROCESSING"
 	) {
@@ -71,16 +101,21 @@ export async function transcribeVideo(
 		.set({ transcriptionStatus: "PROCESSING" })
 		.where(eq(videos.id, videoId));
 
-	const bucket = await createBucketProvider(result.bucket);
+	const [bucket] = await S3Buckets.getBucketAccess(
+		Option.fromNullable(result.bucket?.id),
+	).pipe(runPromise);
 
 	try {
 		const videoKey = `${userId}/${videoId}/result.mp4`;
 
-		const videoUrl = await bucket.getSignedObjectUrl(videoKey);
+		const videoUrl = await bucket.getSignedObjectUrl(videoKey).pipe(runPromise);
 
 		// Check if video file actually exists before transcribing
 		try {
-			const headResponse = await fetch(videoUrl, { method: "HEAD" });
+			const headResponse = await fetch(videoUrl, {
+				method: "GET",
+				headers: { range: "bytes=0-0" },
+			});
 			if (!headResponse.ok) {
 				// Video not ready yet - reset to null for retry
 				await db()
@@ -112,14 +147,23 @@ export async function transcribeVideo(
 
 		// Note: Empty transcription is valid for silent videos (just contains "WEBVTT\n\n")
 		if (transcription === "") {
+			if (serverEnv().NODE_ENV === "development") {
+				console.log(
+					"[transcribeVideo] Development mode, skipping transcription",
+				);
+				return {
+					success: true,
+					message: "Transcription skipped in development mode",
+				};
+			}
 			throw new Error("Failed to transcribe audio");
 		}
 
-		await bucket.putObject(
-			`${userId}/${videoId}/transcription.vtt`,
-			transcription,
-			{ contentType: "text/vtt" },
-		);
+		await bucket
+			.putObject(`${userId}/${videoId}/transcription.vtt`, transcription, {
+				contentType: "text/vtt",
+			})
+			.pipe(runPromise);
 
 		await db()
 			.update(videos)
@@ -240,6 +284,12 @@ function formatTimestamp(seconds: number): string {
 }
 
 async function transcribeAudio(videoUrl: string): Promise<string> {
+	//if dev - don't transcribe
+	if (serverEnv().NODE_ENV === "development") {
+		console.log("[transcribeAudio] Development mode, skipping transcription");
+		return "";
+	}
+
 	console.log("[transcribeAudio] Starting transcription for URL:", videoUrl);
 	const deepgram = createClient(serverEnv().DEEPGRAM_API_KEY as string);
 

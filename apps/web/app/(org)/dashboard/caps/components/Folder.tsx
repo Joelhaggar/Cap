@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { moveVideoToFolder } from "@/actions/folders/moveVideoToFolder";
-import { updateFolder } from "@/actions/folders/updateFolder";
 import { useEffectMutation } from "@/lib/EffectRuntime";
 import { withRpc } from "@/lib/Rpcs";
 import { ConfirmationDialog } from "../../_components/ConfirmationDialog";
@@ -81,6 +80,17 @@ const FolderCard = ({
 		onError: () => {
 			toast.error("Failed to delete folder");
 		},
+	});
+
+	const updateFolder = useEffectMutation({
+		mutationFn: (data: Folder.FolderUpdate) =>
+			withRpc((r) => r.FolderUpdate(data)),
+		onSuccess: () => {
+			toast.success("Folder name updated successfully");
+			router.refresh();
+		},
+		onError: () => toast.error("Failed to update folder name"),
+		onSettled: () => setIsRenaming(false),
 	});
 
 	useEffect(() => {
@@ -175,17 +185,6 @@ const FolderCard = ({
 			document.removeEventListener("dragend", handleDragEnd);
 		};
 	}, [id, name, rive, isDragOver]);
-
-	const updateFolderNameHandler = async () => {
-		try {
-			await updateFolder({ folderId: id, name: updateName });
-			toast.success("Folder name updated successfully");
-		} catch (error) {
-			toast.error("Failed to update folder name");
-		} finally {
-			setIsRenaming(false);
-		}
-	};
 
 	const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
 		e.preventDefault();
@@ -319,7 +318,7 @@ const FolderCard = ({
 				onDragLeave={handleDragLeave}
 				onDrop={handleDrop}
 				className={clsx(
-					"flex justify-between items-center px-4 py-4 w-full h-auto rounded-lg border transition-colors duration-200 cursor-pointer bg-gray-3 hover:bg-gray-4 hover:border-gray-6",
+					"flex justify-between items-center px-4 py-4 w-full h-auto rounded-lg border transition-all duration-200 cursor-pointer bg-gray-3 hover:bg-gray-4 hover:border-gray-6",
 					isDragOver ? "border-blue-10 bg-gray-4" : "border-gray-5",
 					isMovingVideo && "opacity-70",
 				)}
@@ -331,6 +330,7 @@ const FolderCard = ({
 					/>
 					<div
 						onClick={(e) => {
+							e.preventDefault();
 							e.stopPropagation();
 						}}
 						className="flex flex-col justify-center h-10"
@@ -341,33 +341,39 @@ const FolderCard = ({
 								rows={1}
 								value={updateName}
 								onChange={(e) => setUpdateName(e.target.value)}
-								onBlur={async () => {
+								onBlur={() => {
 									setIsRenaming(false);
-									if (updateName.trim() !== name) {
-										await updateFolderNameHandler();
-									}
+									if (updateName.trim() !== name)
+										updateFolder.mutate({
+											id,
+											name: updateName.trim(),
+										});
 								}}
 								onKeyDown={(e) => {
 									if (e.key === "Enter") {
 										setIsRenaming(false);
-										if (updateName.trim() !== name) {
-											updateFolderNameHandler();
-										}
+										if (updateName.trim() !== name)
+											updateFolder.mutate({
+												id,
+												name: updateName.trim(),
+											});
 									}
 								}}
 								className="w-full resize-none bg-transparent border-none focus:outline-none
                  focus:ring-0 focus:border-none text-gray-12 text-[15px] max-w-[116px] truncate p-0 m-0 h-[22px] leading-[22px] overflow-hidden font-normal tracking-normal"
 							/>
 						) : (
-							<p
+							<div
 								onClick={(e) => {
+									e.preventDefault();
 									e.stopPropagation();
 									setIsRenaming(true);
 								}}
-								className="text-[15px] truncate text-gray-12 w-full max-w-[116px] m-0 p-0 h-[22px] leading-[22px] font-normal tracking-normal"
 							>
-								{updateName}
-							</p>
+								<p className="text-[15px] truncate text-gray-12 w-full max-w-[116px] m-0 p-0 h-[22px] leading-[22px] font-normal tracking-normal">
+									{updateName}
+								</p>
+							</div>
 						)}
 						<p className="text-sm truncate text-gray-10 w-fit">{`${videoCount} ${
 							videoCount === 1 ? "video" : "videos"

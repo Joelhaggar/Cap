@@ -3,13 +3,16 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, Minus, Plus } from "lucide-react";
 import moment from "moment";
 import type React from "react";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
-import { VideoThumbnail } from "@/components/VideoThumbnail";
-import type { Video } from "./AddVideosDialogBase";
+import {
+	type ImageLoadingStatus,
+	VideoThumbnail,
+} from "@/components/VideoThumbnail";
+import type { VideoData } from "./AddVideosDialogBase";
 
 interface VideoCardProps {
-	video: Video;
+	video: VideoData;
 	isSelected: boolean;
 	onToggle: () => void;
 	isAlreadyInEntity: boolean;
@@ -21,6 +24,9 @@ const VideoCard: React.FC<VideoCardProps> = memo(
 		const effectiveDate = video.metadata?.customCreatedAt
 			? new Date(video.metadata.customCreatedAt)
 			: video.createdAt;
+
+		const [imageStatus, setImageStatus] =
+			useState<ImageLoadingStatus>("loading");
 
 		return (
 			<div
@@ -100,11 +106,12 @@ const VideoCard: React.FC<VideoCardProps> = memo(
 				>
 					<VideoThumbnail
 						imageClass="w-full h-full transition-all duration-200 group-hover:scale-105"
-						userId={video.ownerId}
 						videoId={video.id}
 						alt={`${video.name} Thumbnail`}
 						objectFit="cover"
 						containerClass="!h-full !rounded-lg !border-b-0"
+						imageStatus={imageStatus}
+						setImageStatus={setImageStatus}
 					/>
 				</div>
 

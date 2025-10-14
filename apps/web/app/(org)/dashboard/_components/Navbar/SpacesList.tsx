@@ -1,6 +1,7 @@
 "use client";
 
 import { Avatar, Button } from "@cap/ui";
+import type { Space } from "@cap/web-domain";
 import {
 	faLayerGroup,
 	faPlus,
@@ -23,7 +24,6 @@ import type { Spaces } from "../../dashboard-data";
 import { LayersIcon } from "../AnimatedIcons";
 import type { LayersIconHandle } from "../AnimatedIcons/Layers";
 import { ConfirmationDialog } from "../ConfirmationDialog";
-import { navItemClass } from "./Items";
 import SpaceDialog from "./SpaceDialog";
 
 const SpacesList = ({ toggleMobileNav }: { toggleMobileNav?: () => void }) => {
@@ -92,7 +92,10 @@ const SpacesList = ({ toggleMobileNav }: { toggleMobileNav?: () => void }) => {
 		setActiveDropTarget(null);
 	};
 
-	const handleDrop = async (e: React.DragEvent, spaceId: string) => {
+	const handleDrop = async (
+		e: React.DragEvent,
+		spaceId: Space.SpaceIdOrOrganisationId,
+	) => {
 		e.preventDefault();
 		setActiveDropTarget(null);
 
@@ -121,7 +124,8 @@ const SpacesList = ({ toggleMobileNav }: { toggleMobileNav?: () => void }) => {
 		}
 	};
 
-	const activeSpaceParams = (spaceId: string) => params.spaceId === spaceId;
+	const activeSpaceParams = (spaceId: Space.SpaceIdOrOrganisationId) =>
+		params.spaceId === spaceId;
 
 	return (
 		<div className="flex flex-col mt-4">
@@ -181,7 +185,7 @@ const SpacesList = ({ toggleMobileNav }: { toggleMobileNav?: () => void }) => {
 						pathname.includes("/dashboard/spaces/browse")
 							? "bg-gray-3 pointer-events-none"
 							: "hover:bg-gray-2",
-						navItemClass,
+						"flex items-center justify-start rounded-xl outline-none tracking-tight overflow-hidden",
 					)}
 				>
 					<LayersIcon

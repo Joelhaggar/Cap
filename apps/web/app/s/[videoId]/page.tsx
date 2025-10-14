@@ -9,13 +9,19 @@ import {
 	spaceVideos,
 	users,
 	videos,
+	videoUploads,
 } from "@cap/database/schema";
 import type { VideoMetadata } from "@cap/database/types";
 import { buildEnv } from "@cap/env";
 import { Logo } from "@cap/ui";
 import { provideOptionalAuth, Videos } from "@cap/web-backend";
 import { VideosPolicy } from "@cap/web-backend/src/Videos/VideosPolicy";
-import { Policy, type Video } from "@cap/web-domain";
+import {
+	Comment,
+	type Organisation,
+	Policy,
+	type Video,
+} from "@cap/web-domain";
 import { eq, type InferSelectModel, sql } from "drizzle-orm";
 import { Effect, Option } from "effect";
 import type { Metadata } from "next";
@@ -24,21 +30,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { generateAiMetadata } from "@/actions/videos/generate-ai-metadata";
 import { getVideoAnalytics } from "@/actions/videos/get-analytics";
-import { getDashboardData } from "@/app/(org)/dashboard/dashboard-data";
+import {
+	getDashboardData,
+	type OrganizationSettings,
+} from "@/app/(org)/dashboard/dashboard-data";
 import { createNotification } from "@/lib/Notification";
 import * as EffectRuntime from "@/lib/server";
 import { transcribeVideo } from "@/lib/transcribe";
+import { optionFromTOrFirst } from "@/utils/effect";
 import { isAiGenerationEnabled } from "@/utils/flags";
 import { PasswordOverlay } from "./_components/PasswordOverlay";
 import { ShareHeader } from "./_components/ShareHeader";
 import { Share } from "./Share";
 
-export const dynamic = "auto";
-export const dynamicParams = true;
-export const revalidate = 30;
-
 // Helper function to fetch shared spaces data for a video
-async function getSharedSpacesForVideo(videoId: string) {
+async function getSharedSpacesForVideo(videoId: Video.VideoId) {
 	// Fetch space-level sharing
 	const spaceSharing = await db()
 		.select({
@@ -94,11 +100,6 @@ async function getSharedSpacesForVideo(videoId: string) {
 	return sharedSpaces;
 }
 
-type Props = {
-	params: { [key: string]: string | string[] | undefined };
-	searchParams: { [key: string]: string | string[] | undefined };
-};
-
 type VideoWithOrganization = typeof videos.$inferSelect & {
 	sharedOrganization?: {
 		organizationId: string;
@@ -109,6 +110,7 @@ type VideoWithOrganization = typeof videos.$inferSelect & {
 	password?: string | null;
 	hasPassword?: boolean;
 	ownerIsPro?: boolean;
+	orgSettings?: OrganizationSettings | null;
 };
 
 const ALLOWED_REFERRERS = [
@@ -121,10 +123,13 @@ const ALLOWED_REFERRERS = [
 	"linkedin.com",
 ];
 
-export function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(
+	props: PageProps<"/s/[videoId]">,
+): Promise<Metadata> {
+	const params = await props.params;
 	const videoId = params.videoId as Video.VideoId;
 
-	const referrer = headers().get("x-referrer") || "";
+	const referrer = (await headers()).get("x-referrer") || "";
 	const isAllowedReferrer = ALLOWED_REFERRERS.some((domain) =>
 		referrer.includes(domain),
 	);
@@ -251,9 +256,9 @@ export function generateMetadata({ params }: Props): Promise<Metadata> {
 	);
 }
 
-export default async function ShareVideoPage(props: Props) {
-	const params = props.params;
-	const searchParams = props.searchParams;
+export default async function ShareVideoPage(props: PageProps<"/s/[videoId]">) {
+	const params = await props.params;
+	const searchParams = await props.searchParams;
 	const videoId = params.videoId as Video.VideoId;
 
 	return Effect.gen(function* () {
@@ -265,15 +270,16 @@ export default async function ShareVideoPage(props: Props) {
 					id: videos.id,
 					name: videos.name,
 					ownerId: videos.ownerId,
+					orgId: videos.orgId,
 					createdAt: videos.createdAt,
 					updatedAt: videos.updatedAt,
-					awsRegion: videos.awsRegion,
-					awsBucket: videos.awsBucket,
 					bucket: videos.bucket,
 					metadata: videos.metadata,
 					public: videos.public,
 					videoStartTime: videos.videoStartTime,
 					audioStartTime: videos.audioStartTime,
+					awsRegion: videos.awsRegion,
+					awsBucket: videos.awsBucket,
 					xStreamInfo: videos.xStreamInfo,
 					jobId: videos.jobId,
 					jobStatus: videos.jobStatus,
@@ -281,19 +287,29 @@ export default async function ShareVideoPage(props: Props) {
 					skipProcessing: videos.skipProcessing,
 					transcriptionStatus: videos.transcriptionStatus,
 					source: videos.source,
+					videoSettings: videos.settings,
 					width: videos.width,
 					height: videos.height,
 					duration: videos.duration,
 					fps: videos.fps,
-					hasPassword: sql<number>`IF(${videos.password} IS NULL, 0, 1)`,
+					hasPassword: sql`${videos.password} IS NOT NULL`.mapWith(Boolean),
 					sharedOrganization: {
 						organizationId: sharedVideos.organizationId,
 					},
-					ownerIsPro: sql<number>`IF(${users.stripeSubscriptionStatus} IN ('active','trialing','complete','paid') OR ${users.thirdPartyStripeSubscriptionId} IS NOT NULL, 1, 0)`,
+					orgSettings: organizations.settings,
+					ownerIsPro:
+						sql`${users.stripeSubscriptionStatus} IN ('active','trialing','complete','paid') OR ${users.thirdPartyStripeSubscriptionId} IS NOT NULL`.mapWith(
+							Boolean,
+						),
+					hasActiveUpload: sql`${videoUploads.videoId} IS NOT NULL`.mapWith(
+						Boolean,
+					),
 				})
 				.from(videos)
 				.leftJoin(sharedVideos, eq(videos.id, sharedVideos.videoId))
 				.leftJoin(users, eq(videos.ownerId, users.id))
+				.leftJoin(videoUploads, eq(videos.id, videoUploads.videoId))
+				.leftJoin(organizations, eq(videos.orgId, organizations.id))
 				.where(eq(videos.id, videoId)),
 		).pipe(Policy.withPublicPolicy(videosPolicy.canView(videoId)));
 
@@ -305,7 +321,7 @@ export default async function ShareVideoPage(props: Props) {
 			Effect.succeed({ needsPassword: true } as const),
 		),
 		Effect.map((data) => (
-			<div className="flex flex-col min-h-screen bg-gray-2">
+			<div key={videoId} className="flex flex-col min-h-screen bg-gray-2">
 				<PasswordOverlay isOpen={data.needsPassword} videoId={videoId} />
 				{!data.needsPassword && (
 					<AuthorizedContent video={data.video} searchParams={searchParams} />
@@ -315,7 +331,10 @@ export default async function ShareVideoPage(props: Props) {
 		Effect.catchTags({
 			PolicyDenied: () =>
 				Effect.succeed(
-					<div className="flex flex-col justify-center items-center p-4 min-h-screen text-center">
+					<div
+						key={videoId}
+						className="flex flex-col justify-center items-center p-4 min-h-screen text-center"
+					>
 						<Logo className="size-32" />
 						<h1 className="mb-2 text-2xl font-semibold">
 							This video is private
@@ -326,10 +345,7 @@ export default async function ShareVideoPage(props: Props) {
 						</p>
 					</div>,
 				),
-			NoSuchElementException: () => {
-				console.log("[ShareVideoPage] No video found for videoId:", videoId);
-				return Effect.succeed(<p>No video found</p>);
-			},
+			NoSuchElementException: () => Effect.sync(() => notFound()),
 		}),
 		provideOptionalAuth,
 		EffectRuntime.runPromise,
@@ -340,10 +356,15 @@ async function AuthorizedContent({
 	video,
 	searchParams,
 }: {
-	video: Omit<InferSelectModel<typeof videos>, "folderId" | "password"> & {
-		sharedOrganization: { organizationId: string } | null;
-		hasPassword: number;
-		ownerIsPro?: number;
+	video: Omit<
+		InferSelectModel<typeof videos>,
+		"folderId" | "password" | "settings"
+	> & {
+		sharedOrganization: { organizationId: Organisation.OrganisationId } | null;
+		hasPassword: boolean;
+		ownerIsPro?: boolean;
+		orgSettings?: OrganizationSettings | null;
+		videoSettings?: OrganizationSettings | null;
 	};
 	searchParams: { [key: string]: string | string[] | undefined };
 }) {
@@ -359,13 +380,17 @@ async function AuthorizedContent({
 				authorId: user.id,
 			});
 		} catch (error) {
-			console.error("Failed to create view notification:", error);
+			console.warn("Failed to create view notification:", error);
 		}
 	}
 
 	const userId = user?.id;
-	const commentId = searchParams.comment as string | undefined;
-	const replyId = searchParams.reply as string | undefined;
+	const commentId = optionFromTOrFirst(searchParams.comment).pipe(
+		Option.map(Comment.CommentId.make),
+	);
+	const replyId = optionFromTOrFirst(searchParams.reply).pipe(
+		Option.map(Comment.CommentId.make),
+	);
 
 	// Fetch spaces data for the sharing dialog
 	let spacesData = null;
@@ -441,11 +466,12 @@ async function AuthorizedContent({
 				id: videos.id,
 				name: videos.name,
 				ownerId: videos.ownerId,
-				ownerIsPro: sql<number>`IF(${users.stripeSubscriptionStatus} IN ('active','trialing','complete','paid') OR ${users.thirdPartyStripeSubscriptionId} IS NOT NULL, 1, 0)`,
+				ownerIsPro:
+					sql`${users.stripeSubscriptionStatus} IN ('active','trialing','complete','paid') OR ${users.thirdPartyStripeSubscriptionId} IS NOT NULL`.mapWith(
+						Boolean,
+					),
 				createdAt: videos.createdAt,
 				updatedAt: videos.updatedAt,
-				awsRegion: videos.awsRegion,
-				awsBucket: videos.awsBucket,
 				bucket: videos.bucket,
 				metadata: videos.metadata,
 				public: videos.public,
@@ -461,10 +487,13 @@ async function AuthorizedContent({
 				sharedOrganization: {
 					organizationId: sharedVideos.organizationId,
 				},
+				orgSettings: organizations.settings,
+				videoSettings: videos.settings,
 			})
 			.from(videos)
 			.leftJoin(sharedVideos, eq(videos.id, sharedVideos.videoId))
 			.leftJoin(users, eq(videos.ownerId, users.id))
+			.leftJoin(organizations, eq(videos.orgId, organizations.id))
 			.where(eq(videos.id, videoId))
 			.execute();
 
@@ -598,15 +627,15 @@ async function AuthorizedContent({
 		: Promise.resolve([]);
 
 	const commentsPromise = (async () => {
-		let toplLevelCommentId: string | undefined;
+		let toplLevelCommentId: Comment.CommentId | undefined;
 
-		if (replyId) {
+		if (Option.isSome(replyId)) {
 			const [parentComment] = await db()
 				.select({ parentCommentId: comments.parentCommentId })
 				.from(comments)
-				.where(eq(comments.id, replyId))
+				.where(eq(comments.id, replyId.value))
 				.limit(1);
-			toplLevelCommentId = parentComment?.parentCommentId;
+			toplLevelCommentId = parentComment?.parentCommentId ?? undefined;
 		}
 
 		const commentToBringToTheTop = toplLevelCommentId ?? commentId;
@@ -652,13 +681,13 @@ async function AuthorizedContent({
 
 	const videoWithOrganizationInfo: VideoWithOrganization = {
 		...video,
-		hasPassword: Number(video.hasPassword) === 1,
-		ownerIsPro: Number(video.ownerIsPro) === 1,
 		organizationMembers: membersList.map((member) => member.userId),
 		organizationId: video.sharedOrganization?.organizationId ?? undefined,
 		sharedOrganizations: sharedOrganizations,
 		password: null,
 		folderId: null,
+		orgSettings: video.orgSettings || null,
+		settings: video.videoSettings || null,
 	};
 
 	return (
@@ -684,6 +713,7 @@ async function AuthorizedContent({
 
 				<Share
 					data={videoWithOrganizationInfo}
+					videoSettings={videoWithOrganizationInfo.settings}
 					user={user}
 					comments={commentsPromise}
 					views={viewsPromise}
