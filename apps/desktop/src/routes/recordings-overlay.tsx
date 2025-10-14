@@ -713,15 +713,15 @@ function createRecordingMutations(
 			const metadata = await commands.getVideoMetadata(media.path);
 			const plan = await commands.checkUpgradedAndUpdate();
 			const canShare = {
-				allowed: plan || metadata.duration < 300,
-				reason: !plan && metadata.duration >= 300 ? "upgrade_required" : null,
+				allowed: plan || metadata.duration < 7200,
+				reason: !plan && metadata.duration >= 7200 ? "upgrade_required" : null,
 			};
 
 			if (!canShare.allowed) {
 				if (canShare.reason === "upgrade_required") {
 					await commands.showWindow("Upgrade");
 					throw new Error(
-						"Upgrade required to share recordings longer than 5 minutes",
+						"Upgrade required to share recordings longer than 120 minutes",
 					);
 				}
 			}

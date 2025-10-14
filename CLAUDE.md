@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides comprehensive guidance to Claude Code when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -43,34 +43,40 @@ Cap is the open source alternative to Loom. It's a Turborepo monorepo with a Tau
 - `packages/database/schema.ts` — Database schema definitions
 - `*.config.*` — Configuration files (Next.js, Tailwind, etc.)
 
-## Key Commands
+## Project Location
 
-### Development
+The main codebase is located in the `Cap/` subdirectory. All commands should be run from `/Users/joel/DevProjects/Cap/Cap/` unless otherwise specified.
+
+## Quick Start Commands
+
 ```bash
+cd Cap/                    # Navigate to main codebase
+pnpm install              # Install dependencies
+pnpm cap-setup           # Install native dependencies (FFmpeg, etc.)
+pnpm env-setup           # Generate .env file with interactive setup
+pnpm dev                 # Run both desktop and web apps
+pnpm dev:web             # Run web app only (Next.js)
+pnpm dev:desktop         # Run desktop app only (Tauri)
+```
+
+## Key Development Commands
+
+```bash
+# Development
 pnpm dev:web             # Start Next.js dev server (apps/web only)
-pnpm run dev:desktop     # Start Tauri desktop dev (apps/desktop)
+pnpm dev:desktop         # Start Tauri desktop dev (apps/desktop)
 pnpm build               # Build all packages/apps via Turbo
 pnpm lint                # Lint with Biome across the repo
 pnpm format              # Format with Biome
 pnpm typecheck           # TypeScript project references build
-```
 
-### Database Operations
-```bash
+# Database Operations
 pnpm db:generate         # Generate Drizzle migrations
 pnpm db:push             # Push schema changes to MySQL
 pnpm db:studio           # Open Drizzle Studio
-pnpm --dir packages/database db:check  # Verify database schema
-```
 
-### App-Specific Commands
-```bash
-# Web app (apps/web)
-cd apps/web && pnpm dev          # Start Next.js dev server
-
-# Desktop (apps/desktop)
-cd apps/desktop && pnpm dev      # Start SolidStart + Tauri dev
-pnpm tauri:build                 # Build desktop app (release)
+# App-Specific
+pnpm tauri:build         # Build desktop app (release)
 ```
 
 ## Development Environment Guidelines
@@ -111,13 +117,11 @@ pnpm tauri:build                 # Build desktop app (release)
 - **Package Manager**: pnpm (`pnpm@10.5.2`)
 - **Build System**: Turborepo
 - **Frontend (Web)**: React 19 + Next.js 14.2.x (App Router)
-- **Desktop**: Tauri v2, Rust 2024, SolidStart
-- **Styling**: Tailwind CSS (web consumes `@cap/ui/tailwind`)
-- **Server State**: TanStack Query v5 on web; `@tanstack/solid-query` on desktop
-- **Database**: MySQL (PlanetScale) with Drizzle ORM
-- **AI Integration**: Groq preferred, OpenAI fallback; invoked in Next.js Server Actions
+- **Desktop**: Tauri v2, Rust, SolidStart
+- **Database**: MySQL with Drizzle ORM
+- **AI Integration**: Groq (primary) + OpenAI (fallback)
 - **Analytics**: PostHog
-- **Payments**: Stripe
+- **Styling**: Tailwind CSS
 
 ### Critical Architectural Decisions
 1. **AI on the Server**: All Groq/OpenAI calls execute in Server Actions under `apps/web/actions`. Never call AI from client components.
@@ -369,12 +373,24 @@ Minimize `useEffect` usage: compute during render, handle logic in event handler
 - **Processing Location**: All AI calls in Next.js Server Actions only
 - **Privacy**: Transcripts stored in database, audio sent to external APIs
 
+### Required AI API Keys (Optional)
+- `GROQ_API_KEY` - Primary AI provider (LLaMA-4 Maverick model)
+- `OPENAI_API_KEY` - Fallback AI provider (GPT-4o-mini)
+- `DEEPGRAM_API_KEY` - Audio transcription service
+
 ### Media Processing Flow
 ```
-Desktop Recording → Local Files → Upload to S3 → 
-Background Processing (tasks service) → 
+Desktop Recording → Local Files → Upload to S3 →
+Background Processing (tasks service) →
 Transcription/AI Enhancement → Database Storage
 ```
+
+## Critical Architecture Notes
+
+1. **AI on the Server**: All Groq/OpenAI calls execute in Server Actions under `apps/web/actions`
+2. **Auto-generated Files**: NEVER EDIT `tauri.ts`, `queries.ts`, or files under `apps/desktop/src-tauri/gen/`
+3. **Database Changes**: Always run `pnpm db:generate` before `pnpm db:push`
+4. **Node Version**: Must use Node 20 (specified in package.json engines)
 
 ## References & Documentation
 
@@ -391,7 +407,19 @@ Transcription/AI Enhancement → Database Storage
 - **API Documentation**: Generated from TypeScript contracts
 - **Architecture Decisions**: See individual package READMEs
 
-### Development Resources
-- **Monorepo Guide**: Turborepo documentation
-- **Effect System**: Used in web-backend packages
-- **Media Processing**: FFmpeg documentation for Rust bindings
+## Development Environment Requirements
+
+- Node Version 20+
+- Rust 1.88.0+
+- pnpm 10.5.2 (locked version)
+- Docker (OrbStack recommended on macOS)
+
+## Important Conventions
+
+- No code comments: Code must be self-explanatory through naming and structure
+- Directory naming: lower-case-dashed
+- Components: PascalCase; hooks: camelCase starting with `use`
+- Strict TypeScript; avoid `any`
+- Use Biome for linting/formatting
+
+For detailed architectural information, implementation patterns, and troubleshooting, see the comprehensive CLAUDE.md file in the Cap/ directory.

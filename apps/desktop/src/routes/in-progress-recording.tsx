@@ -33,7 +33,7 @@ declare global {
 	}
 }
 
-const MAX_RECORDING_FOR_FREE = 5 * 60 * 1000;
+const MAX_RECORDING_FOR_FREE = 120 * 60 * 1000;
 
 export default function () {
 	const [state, setState] = createSignal<State>(
