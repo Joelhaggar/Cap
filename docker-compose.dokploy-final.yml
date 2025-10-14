@@ -14,13 +14,23 @@ services:
       NODE_ENV: ${NODE_ENV}
 
       # ---- Public Environment Variables (Client-side) ----
+      NEXT_PUBLIC_IS_CAP: ${NEXT_PUBLIC_IS_CAP}
       NEXT_PUBLIC_WEB_URL: ${WEB_URL}
       NEXT_PUBLIC_CAP_AWS_BUCKET: ${CAP_AWS_BUCKET}
       NEXT_PUBLIC_CAP_AWS_REGION: ${CAP_AWS_REGION}
+      NEXT_PUBLIC_CAP_AWS_ENDPOINT: ${CAP_AWS_ENDPOINT}
+      NEXT_PUBLIC_S3_FORCE_PATH_STYLE: ${NEXT_PUBLIC_S3_FORCE_PATH_STYLE}
       NEXT_PUBLIC_DOCKER_BUILD: "true"
 
       # ---- Database ----
       DATABASE_URL: ${DATABASE_URL}
+      DATABASE_MIGRATION_URL: ${DATABASE_MIGRATION_URL}
+
+      # ---- Third Party APIs ----
+      DUB_API_KEY: ${DUB_API_KEY}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
 
       # ---- S3/MinIO Storage Configuration ----
       CAP_AWS_BUCKET: ${CAP_AWS_BUCKET}
